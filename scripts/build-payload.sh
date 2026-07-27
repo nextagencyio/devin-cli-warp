@@ -9,11 +9,9 @@
 #       --arg query "$QUERY" \
 #       --arg response "$RESPONSE")
 #
-# Devin CLI hooks do NOT provide session_id or cwd in stdin (unlike Gemini/Claude).
-# This script synthesizes them:
-#   - cwd: from $DEVIN_PROJECT_DIR (set by Devin CLI)
-#   - session_id: generated at SessionStart, cached in a temp file keyed by PPID + project.
-#                 Subsequent hooks read the cached value. SessionEnd cleans it up.
+# Devin CLI hooks provide session_id in stdin JSON (e.g. "frill-purple").
+# cwd comes from $DEVIN_PROJECT_DIR (set by Devin CLI).
+# We extract session_id from stdin; fall back to a synthesized UUID only if missing.
 
 # The current protocol version this plugin knows how to produce.
 PLUGIN_CURRENT_PROTOCOL_VERSION=1
@@ -78,9 +76,18 @@ build_payload() {
     local protocol_version
     protocol_version=$(negotiate_protocol_version)
 
-    # Devin doesn't provide session_id or cwd in stdin — synthesize them.
+    # Extract session_id from Devin's stdin JSON (e.g. "frill-purple").
+    # Fall back to the cached/synthesized value only if Devin didn't provide one.
     local session_id cwd project
-    session_id=$(_get_session_id)
+    local stdin_session_id
+    stdin_session_id=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null)
+    if [ -n "$stdin_session_id" ]; then
+        session_id="$stdin_session_id"
+        # Update the cache so other hooks that might not get stdin still see it.
+        _save_session_id "$session_id"
+    else
+        session_id=$(_get_session_id)
+    fi
     cwd="${DEVIN_PROJECT_DIR:-}"
     project=""
     if [ -n "$cwd" ]; then
