@@ -1,0 +1,8 @@
+{
+  "name": "devin-warp",
+  "description": "Warp terminal integration for Devin CLI - native notifications and session status",
+  "version": "1.0.0",
+  "agent_slug": "devin",
+  "homepage": "https://github.com/nextagencyio/devin-cli-warp",
+  "license": "MIT"
+}
